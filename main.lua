@@ -48,6 +48,9 @@ mute = false
 backbars = {}
 bgh = 80
 music = nil
+bgV = 20
+
+white = {r = 255, g = 255, b = 255}
 
 function initValues()
   evolDyn.killed = 0
@@ -57,7 +60,7 @@ end
 function initBG()
   y = -5
   while y < love.graphics.getHeight() + 5 do
-    bar = {y = y, col = {r = 255, g = 255, b = 255}, h=6}
+    bar = {y = y, col = white, h=6}
     table.insert(backbars, bar)
     y = y + bgh
   end
@@ -66,7 +69,7 @@ end
 function moveBG(dt)
   my = 9999
   for i, bar in ipairs(backbars) do
-    bar.y = bar.y + 20*dt
+    bar.y = bar.y + bgV*dt
     if bar.y > love.graphics.getHeight() + 1 then
       table.remove(backbars, i)
     end
@@ -75,7 +78,7 @@ function moveBG(dt)
     end
   end
   if my > -1 then
-    table.insert(backbars, {y = my - bgh, col = {r = 255, g = 255, b = 255}, h=6})
+    table.insert(backbars, {y = my - bgh, col = white, h=6})
   end
 end
 
@@ -83,7 +86,7 @@ function drawBG()
   r, g, b, a = love.graphics.getColor()
   for i, bar in ipairs(backbars) do
     love.graphics.setColor(bar.col.r, bar.col.g, bar.col.b)
-    love.graphics.rectangle("fill", -5, bar.y, love.graphics.getWidth() + 5, bar.h)
+    love.graphics.rectangle("fill", -5, gridPos(bar.y), love.graphics.getWidth() + 5, bar.h)
   end
   love.graphics.setColor(r, g, b, a)
 end
@@ -93,6 +96,16 @@ function initPlayer()
   player.y = love.graphics.getHeight() - 100
   player.accel = playerParams.accel
   player.speed = {x = 0, y = 0}
+end
+
+function loseOneLife()
+  enemies = {}
+  enemyBullets = {}
+  bullets = {}
+  lives = lives - 1
+  --playRandomSound(playerDyn.sounds)
+  initPlayer()
+  if lives == 0 then gameover = true end
 end
 
 function love.load(arg)
@@ -153,9 +166,10 @@ function byebye()
 end
 
 function switchWeapon(back)
-  weaponDyn.weaponIdx = (weaponDyn.weaponIdx + (back and -1 or 1)) % 3
+  weaponDyn.weaponIdx = (weaponDyn.weaponIdx + (back and -1 or 1)) % #weapons.names
   weaponDyn.currentWeapon = weapons.names[weaponDyn.weaponIdx+1]
   weaponDyn.freq = weapons.params[weaponDyn.currentWeapon].freq
+  weaponDyn.canShootTimer = 1/weaponDyn.freq
 end
 
 -- edges
@@ -183,9 +197,14 @@ function constrainToEdges(dt)
   end
 end
 
+-- a very slow function
+function evolveFunc(x)
+  return math.log(305 + x) / math.log(1.1) - math.log(305)/math.log(1.1)
+end
+
 function nextLevel(dt)
   -- TODO: this will change very soon
-  if math.log(1+evolDyn.killed) / math.log(2) > (evolDyn.lv + 1)
+  if evolveFunc(evolDyn.killed) > evolDyn.lv
       and not evolDyn.stopGettingHarder then
       evolDyn.thrshm = evolDyn.thrshm * evolDyn.thrshm
       evolParams.stopGettingHarder = true

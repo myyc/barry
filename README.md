@@ -14,5 +14,8 @@ Features:
 * Some weapons (change with shift)
 * Some enemies (game becomes unplayable soon)
 * Gamepad support
+* A BLACK HOLE GUN THAT'S PRETTY FUCKING AMAZING
+
+Space to shoot, shift to switch weapons (L1-R1 on a gamepad).
 
 More stuff to come.

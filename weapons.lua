@@ -1,11 +1,11 @@
 require "aux"
 
 weapons = {
-  names = {"stars", "machinegun", "rockets"},
+  names = {},
   params = {
     stars = {
       ttl = 9000,
-      speed = 500,
+      v = {x = 0, y = 500},
       sprite = "assets/img/star.png",
       img = nil,
       type = "bullet",
@@ -13,21 +13,23 @@ weapons = {
       dmg = 200,
       shootFunc = nil,
       sounds = {},
+      deviation = 50,
     },
     machinegun = {
       ttl = 0.8,
-      speed = 800,
+      v = {x = 0, y = 800},
       sprite = "assets/img/bullet.png",
       img = nil,
       type = "bullet",
       freq = 50,
       dmg = 30,
       shootFunc = nil,
+      deviation = 100,
       sounds = {}
     },
     rockets = {
       ttl = 9000,
-      speed = {x = 0, y = 30},
+      v = {x = 0, y = 30},
       accel = 800,
       sprite = "assets/img/missile.png",
       img = nil,
@@ -38,28 +40,52 @@ weapons = {
       shootFunc = nil,
       deviation = 100,
       sounds = {},
+    },
+    blackholegun = {
+      ttl = 2,
+      v = {x = 0, y = 200},
+      sprite = "assets/img/blackholebullet.png",
+      type = "bullet",
+      freq = 1.5,
+      dmg = 0,
+      deviation = 30,
+      sounds = {}
     }
   }
 }
-
-collisions = {"bullet", "ray", "rocket"}
 
 weaponDyn = {
   weaponIdx = 0,
   currentWeapon = "stars",
   canShoot = true,
   freq = weapons.params.stars.freq,
-  canShootTimer = weapons.params.stars.freq,
+  canShootTimer = 1/weapons.params.stars.freq,
+}
+
+blackHoleParams = {
+  enemies = 3,
+  sprite = "assets/img/blackhole.png",
+  gravc = 20000,
+  radius = 30,
+  dmg = 999999
 }
 
 function initWeapons()
   weapons.params.machinegun.img = love.graphics.newImage(weapons.params.machinegun.sprite)
   weapons.params.stars.img = love.graphics.newImage(weapons.params.stars.sprite)
   weapons.params.rockets.img = love.graphics.newImage(weapons.params.rockets.sprite)
+  weapons.params.blackholegun.img = love.graphics.newImage(weapons.params.blackholegun.sprite)
+
+  blackHoleParams.img = love.graphics.newImage(blackHoleParams.sprite)
 
   weapons.params.machinegun.shootFunc = shootMachineGun
   weapons.params.stars.shootFunc = shootStar
   weapons.params.rockets.shootFunc = shootRocket
+  weapons.params.blackholegun.shootFunc = shootBlackHole
+
+  for type, params in pairs(weapons.params) do
+    table.insert(weapons.names, type)
+  end
 
   -- uncomment when sounds are back
   --[[
@@ -78,13 +104,32 @@ function initWeapons()
   ]]--
 end
 
+function getTTL(ttl)
+  m = 0.5 + math.random()
+  return m*ttl
+end
+
+function createBlackHole(x, y)
+  blackHole = {x = x, y = y, enemies = blackHoleParams.enemies,
+               img = blackHoleParams.img, v = {x = 0, y = 0},
+               weapon = "blackhole", params = blackHoleParams, ttl = 9000,
+               gravc = blackHoleParams.gravc, radius = blackHoleParams.radius,
+               dmg = blackHoleParams.dmg
+              }
+  table.insert(bullets, blackHole)
+end
+
 function shootStar(bullets)
   params = weapons.params.stars
   bullet = {
     x = player.x,
-    y = player.y - 0.7*player.img:getHeight(), img = params.img, weapon = "star", ttl = params.ttl,
-    params = params,
+    y = player.y - 0.7*player.img:getHeight(),
+    img = params.img, weapon = "star", ttl = params.ttl,
+    params = params, v = {x = params.v.x, y = params.v.y}
   }
+
+  bullet.v.x = params.deviation*(0.5-love.math.random())
+
   table.insert(bullets, bullet)
 end
 
@@ -93,9 +138,12 @@ function shootMachineGun(bullets)
   for i = -1, 1, 2 do
     bullet = {
       x = player.x + i*0.33*player.img:getWidth(),
-      y = player.y, img = params.img, weapon = "machinegun", ttl = params.ttl,
-      params = params,
+      y = player.y, img = params.img, weapon = "machinegun", ttl = getTTL(params.ttl),
+      params = params, v = {x = params.v.x, y = params.v.y},
     }
+
+    bullet.v.x = params.deviation*(0.5-love.math.random())
+
     table.insert(bullets, bullet)
   end
 end
@@ -106,44 +154,68 @@ function shootRocket(bullets)
     x = player.x,
     y = player.y - 0.7*player.img:getHeight(), img = params.img,
     weapon = "rockets", ttl = params.ttl,
-    params = params, speed = {}
+    params = params, v = {x = params.v.x, y = params.v.y}
   }
 
-  bullet.speed.y = params.speed.y
-  bullet.speed.x = params.deviation*(0.5-love.math.random())
+  bullet.v.x = params.deviation*(0.5-love.math.random())
+
+  table.insert(bullets, bullet)
+end
+
+function shootBlackHole(bullets)
+  params = weapons.params.blackholegun
+  bullet = {
+    x = player.x,
+    y = player.y - 0.7*player.img:getHeight(),
+    img = params.img, weapon = "blackholegun", ttl = params.ttl,
+    params = params, v = {x = params.v.x, y = params.v.y}
+  }
+
+  bullet.v.x = params.deviation*(0.5-love.math.random())
 
   table.insert(bullets, bullet)
 end
 
 function moveUniform(dt, bullets, i)
   bullet = bullets[i]
-  bullet.y = bullet.y - (bullet.params.speed * dt)
+  bullet.y = bullet.y - (bullet.v.y * dt)
+  bullet.x = bullet.x - (bullet.v.x * dt)
 
   bullet.ttl = bullet.ttl - dt
 
-  if bullet.y < 0 or bullet.ttl < 0 then
+  if bullet.y < 0 then
     table.remove(bullets, i)
   end
 end
 
 function moveAccel(dt, bullets, i)
   bullet = bullets[i]
-  bullet.speed.y = bullet.params.accel*dt + bullet.speed.y
-  bullet.x = bullet.x + (bullet.speed.x * dt)
-  bullet.y = bullet.y - (bullet.speed.y * dt)
+  bullet.v.y = bullet.params.accel*dt + bullet.v.y
+  bullet.x = bullet.x + (bullet.v.x * dt)
+  bullet.y = bullet.y - (bullet.v.y * dt)
 
   bullet.ttl = bullet.ttl - dt
 
-  if bullet.y < 0 or bullet.ttl < 0 then
+  if bullet.y < 0 then
     table.remove(bullets, i)
   end
 end
 
 function moveBullet(dt, bullets, i)
-  if bullets[i].params.type == "bullet" then
+  bullet = bullets[i]
+  bullet.y = bullet.y + bgV*dt
+
+  if bullet.params.type == "bullet" then
     moveUniform(dt, bullets, i)
-  elseif bullets[i].params.type == "rocket" then
+  elseif bullet.params.type == "rocket" then
     moveAccel(dt, bullets, i)
+  end
+
+  if bullet.ttl < 0 or (bullet.enemies ~= nil and bullet.enemies == 0) then
+    if bullet.weapon == "blackholegun" then
+      createBlackHole(bullet.x, bullet.y)
+    end
+    table.remove(bullets, i)
   end
 end
 
@@ -151,18 +223,23 @@ function collideBullet(bullet, enemy)
   collided = false
   if bullet.params.type == "bullet" or bullet.params.type == "rocket" then
     collided = simpleCollision(bullet, enemy)
+  elseif bullet.weapon == "blackhole" then
+    dx = bullet.x - enemy.x
+    dy = bullet.y - enemy.y
+    collided = dx*dx + dy*dy < bullet.radius*bullet.radius
   end
   if collided then
     enemy.life = enemy.life - bullet.params.dmg
+    if bullet.weapon == "blackhole" then
+      bullet.enemies = bullet.enemies - 1
+    end
   end
   return collided
 end
 
 function drawBullet(bullet)
-  if bullet.params.type == "bullet" or bullet.params.type == "rocket" then
-    love.graphics.draw(bullet.img, gridPos(bullet.x - bullet.img:getWidth()/2),
-                       gridPos(bullet.y - bullet.img:getHeight() / 2))
-  end
+  love.graphics.draw(bullet.img, gridPos(bullet.x - bullet.img:getWidth()/2),
+                     gridPos(bullet.y - bullet.img:getHeight() / 2))
 end
 
 function shoot(bullets)
