@@ -18,7 +18,7 @@ playerParams = {
 -- evolution params, static, tunable
 evolParams = {
   thrsh = 0.02,
-  thrshMultInit = 1.01
+  thrshMultInit = 1.02
 }
 
 -- player params, dynamic
@@ -58,6 +58,7 @@ function resetLevelState()
   evolDyn.killed = 0
   evolDyn.lv = 1
   lives = 3
+  evolDyn.thrshm = evolParams.thrshMultInit
 
   initPlayer()
 end
@@ -207,10 +208,11 @@ end
 function nextLevel(dt)
   -- TODO: this will change very soon
   if evolveFunc(evolDyn.killed) > evolDyn.lv
-      and not evolDyn.stopGettingHarder then
+    and not evolDyn.stopGettingHarder then
       evolDyn.thrshm = evolDyn.thrshm * evolDyn.thrshm
       evolParams.stopGettingHarder = true
       evolDyn.lv = evolDyn.lv + 1
+      print(evolDyn.thrshm)
   end
 end
 
