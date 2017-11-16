@@ -4,6 +4,11 @@ function love.joystickadded(j)
     joystick = j
 end
 
+function isReasonable(key)
+  return key ~= "shift" and key ~= "lshift" and key ~= "rshift" and
+    key ~= "up" and key ~= "down" and key ~= "left" and key ~= "right"
+end
+
 function handleJoystick(dt)
   if joystick ~= nil then
     if joystick:isGamepadDown("back") then
@@ -32,7 +37,7 @@ end
 
 function handleKeyboard(dt)
   if love.keyboard.isDown("escape") then
-    byebye()
+    switchToMenu()
   end
 
   if love.keyboard.isDown("left", "a") then
@@ -55,30 +60,63 @@ function handleKeyboard(dt)
 end
 
 function love.gamepadreleased(joystick, key)
-  if key == "triggerleft" or key == "triggerright" then
-    mute = not nute
-  end
-  if not gameover then
-    if key == "leftshoulder" or key == "rightshoulder" or key == "x" or key == "y" then
-      switchWeapon(key == "leftshoulder"  or key == "x")
-    elseif key == "start" then
-      paused = not paused
-    elseif key == "back" then
+  if gameState == gameStates.level then
+    if not gameover then
+      if key == "leftshoulder" or key == "rightshoulder" or key == "x" or key == "y" then
+        switchWeapon(key == "leftshoulder"  or key == "x")
+      elseif key == "start" then
+        paused = not paused
+      elseif key == "back" then
+        switchToMenu()
+      end
+    else
+      if gameoverTimeout < 0 then
+        gameover = false
+        if key == "back" then
+          byebye()
+        else
+          switchToMenu()
+        end
+      end
+    end
+  elseif gameState == "menu" and isMenuIdle() then
+    if key == "back" then
       byebye()
+    else
+      gameState = gameStates.level
+      resetLevelState()
     end
   end
 end
 
 function love.keyreleased(key)
-  if not gameover then
-     if key == "shift" or key == "lshift" or key == "rshift" then
-       switchWeapon()
-     elseif key == "p" then
-       paused = not paused
-     elseif key == "m" then
-       mute = not mute
-     elseif key == "q" then
-       byebye()
-     end
+  if gameState == gameStates.level then
+    if not gameover then
+       if key == "shift" or key == "lshift" or key == "rshift" then
+         switchWeapon()
+       elseif key == "p" then
+         paused = not paused
+       elseif key == "m" then
+         mute = not mute
+       elseif key == "q" then
+         switchToMenu()
+       end
+    else
+      if gameoverTimeout < 0 then
+        gameover = false
+        if key == "q" or key == "escape" then
+          byebye()
+        else
+          switchToMenu()
+        end
+      end
+    end
+  elseif gameState == gameStates.menu and isMenuIdle() then
+    if key == "q" or key == "escape" then
+      byebye()
+    elseif isReasonable(key) then
+      gameState = gameStates.level
+      resetLevelState()
+    end
   end
 end

@@ -151,10 +151,12 @@ function enemiesCollide(dt)
       --playRandomSound(enemyDyn.sounds)
     end
 
-    -- yourself (to be made a bit more difficult)
-    if simpleCollision(player, enemy) then
-      loseOneLife()
-      break
+    -- yourself
+    if enemy.params.motion ~= "still" then
+      if simpleCollision(player, enemy) then
+        loseOneLife()
+        break
+      end
     end
   end
 end
