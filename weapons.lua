@@ -22,7 +22,7 @@ weapons = {
       img = nil,
       type = "bullet",
       freq = 50,
-      dmg = 30,
+      dmg = 4,
       shootFunc = nil,
       deviation = 100,
       sounds = {}
@@ -42,8 +42,8 @@ weapons = {
       sounds = {},
     },
     blackholegun = {
-      ttl = 2,
-      v = {x = 0, y = 200},
+      ttl = 0.7,
+      v = {x = 0, y = 400},
       sprite = "assets/img/blackholebullet.png",
       type = "bullet",
       freq = 1.5,

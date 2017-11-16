@@ -1,3 +1,4 @@
 *.love
 *~
 *.DS_Store
+bundle/*.app

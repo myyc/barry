@@ -18,7 +18,7 @@ playerParams = {
 -- evolution params, static, tunable
 evolParams = {
   thrsh = 0.02,
-  thrshMultInit = 1.02
+  thrshMultInit = 1.01
 }
 
 -- player params, dynamic
