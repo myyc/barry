@@ -14,6 +14,7 @@ weapons = {
       shootFunc = nil,
       sounds = {},
       deviation = 50,
+      radius = 20,
     },
     machinegun = {
       ttl = 0.8,
@@ -25,7 +26,8 @@ weapons = {
       dmg = 4,
       shootFunc = nil,
       deviation = 100,
-      sounds = {}
+      sounds = {},
+      radius = 5
     },
     rockets = {
       ttl = 9000,
@@ -63,10 +65,10 @@ weaponDyn = {
 }
 
 blackHoleParams = {
-  enemies = 3,
-  sprite = "assets/img/blackhole.png",
-  gravc = 20000,
-  radius = 30,
+  mass = 400,
+  sprite = "assets/img/blackhole2.png",
+  gravc = 2000000000,
+  radius = 60,
   dmg = 999999
 }
 
@@ -110,7 +112,7 @@ function getTTL(ttl)
 end
 
 function createBlackHole(x, y)
-  blackHole = {x = x, y = y, enemies = blackHoleParams.enemies,
+  blackHole = {x = x, y = y, mass = blackHoleParams.mass,
                img = blackHoleParams.img, v = {x = 0, y = 0},
                weapon = "blackhole", params = blackHoleParams, ttl = 9000,
                gravc = blackHoleParams.gravc, radius = blackHoleParams.radius,
@@ -211,7 +213,7 @@ function moveBullet(dt, bullets, i)
     moveAccel(dt, bullets, i)
   end
 
-  if bullet.ttl < 0 or (bullet.enemies ~= nil and bullet.enemies == 0) then
+  if bullet.ttl < 0 or (bullet.mass ~= nil and bullet.mass == 0) then
     if bullet.weapon == "blackholegun" then
       createBlackHole(bullet.x, bullet.y)
     end
@@ -230,8 +232,8 @@ function collideBullet(bullet, enemy)
   end
   if collided then
     enemy.life = enemy.life - bullet.params.dmg
-    if bullet.weapon == "blackhole" then
-      bullet.enemies = bullet.enemies - 1
+    if bullet.weapon == "blackhole" and enemy.mass ~= nil then
+      bullet.mass = bullet.mass - enemy.mass
     end
   end
   return collided

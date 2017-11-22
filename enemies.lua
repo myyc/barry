@@ -6,6 +6,7 @@ enemyParams = {
       a = {x = 0, y = 0},
       v = {x = 0, y = 0},
       vAvg = {x = 0, y = 100},
+      m = 100,
       speedBand = 0.1,
       sprite = "assets/img/invader1.png",
       life = 100,
@@ -14,7 +15,8 @@ enemyParams = {
     wavy = {
       a = {x = 0, y = 0},
       v = {x = 0, y = 0},
-      k = {x = 20, y = 0},
+      k = {x = 2000, y = 0},
+      m = 100,
       vAvg = {x = 350, y = 80},
       dAvg = {x = 100, y = 0},
       speedBand = 0.1,
@@ -32,7 +34,9 @@ enemyParams = {
       initialTimeout = 2,
       bullets = 6,
       bulletParams = {
+        m = 30,
         avgSpeed = 200,
+        life = 1,
         sprite = "assets/img/bullet.png"
       }
     }
@@ -96,6 +100,7 @@ function enemiesGenerate(dt)
       y = - img:getHeight() - 5,
       v = {x = params.v.x, y = params.v.y},
       a = {x = params.a.x, y = params.a.y},
+      m = params.m,
       img = img,
       life = params.life,
       type = type,
@@ -130,6 +135,11 @@ function enemiesCollide(dt)
         collided = true
       end
     end
+    for j, enemyBullet in ipairs(enemyBullets) do
+      if collideBullet(bullet, enemyBullet) then
+        collided = true
+      end
+    end
     if collided then
       table.remove(bullets, i)
     end
@@ -139,6 +149,12 @@ function enemiesCollide(dt)
     if simpleCollision(player, bullet) then
       loseOneLife()
       break
+    end
+  end
+
+  for j, bullet in ipairs(enemyBullets) do
+    if bullet.life <= 0 then
+      table.remove(enemyBullets, j)
     end
   end
 
@@ -170,7 +186,7 @@ function inertia(dt, o)
 end
 
 function moveWavy(dt, o)
-  o.a.x = o.a.x - o.k.x*(o.x - o.xc)
+  o.a.x = o.a.x - o.k.x*(o.x - o.xc)/o.m
 end
 
 function enemyActivate(dt, enemy)
@@ -179,6 +195,8 @@ function enemyActivate(dt, enemy)
     bullet = {
       x = enemy.x,
       y = enemy.y, img = params.img,
+      m = params.m,
+      life = params.life,
       params = params,
     }
 
@@ -202,22 +220,26 @@ function enemyActivate(dt, enemy)
   end
 end
 
+function addGravity(dt, enemy)
+  for i, bullet in ipairs(bullets) do
+    if bullet.weapon == "blackhole" then
+      if enemy.m ~= nil then
+        dx = enemy.x - bullet.x
+        dy = enemy.y - bullet.y
+        d = math.sqrt(dx*dx + dy*dy)
+
+        fc = bullet.gravc / (d*d*d)
+        enemy.a.x = -dx*fc/enemy.m
+        enemy.a.y = -dy*fc/enemy.m
+      end
+    end
+  end
+end
+
 function enemiesMove(dt)
   for i, enemy in ipairs(enemies) do
     enemy.a = {x = enemy.params.a.x, y = enemy.params.a.y}
-    for i, bullet in ipairs(bullets) do
-      if bullet.weapon == "blackhole" then
-        if enemy.params.motion ~= "still" then
-          dx = enemy.x - bullet.x
-          dy = enemy.y - bullet.y
-          d = math.sqrt(dx*dx + dy*dy)
-
-          fc = bullet.gravc * 1000 / (d*d*d)
-          enemy.a.x = -dx*fc
-          enemy.a.y = -dy*fc
-        end
-      end
-    end
+    addGravity(dt, enemy)
 
     if enemy.type == "wavy" then
       moveWavy(dt, enemy)
@@ -241,6 +263,7 @@ function enemiesMove(dt)
   end
 
   for i, bullet in ipairs(enemyBullets) do
+    addGravity(dt, bullet)
     inertia(dt, bullet)
     bullet.y = bullet.y + bgV*dt
     if bullet.x < 10 or bullet.x > love.graphics.getWidth() + 10
