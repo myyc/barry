@@ -3,8 +3,6 @@ enemyParams = {
   names = {}, -- filled programmatically
   params = {
     dumb = {
-      a = {x = 0, y = 0},
-      v = {x = 0, y = 0},
       vAvg = {x = 0, y = 100},
       m = 100,
       speedBand = 0.1,
@@ -13,12 +11,9 @@ enemyParams = {
       motion = "uniform",
     },
     wavy = {
-      a = {x = 0, y = 0},
-      v = {x = 0, y = 0},
-      k = {x = 2000, y = 0},
+      k = {x = 5, y = 0},
       m = 100,
       vAvg = {x = 350, y = 80},
-      dAvg = {x = 100, y = 0},
       speedBand = 0.1,
       sprite = "assets/img/invader2.png",
       motion = "uniform",
@@ -57,8 +52,6 @@ enemyState = {
 
 enemies = {}
 
-enemyBullets = {}
-
 function addSSParams(enemy, dt)
   enemy.bulletParams = enemy.params.bulletParams
   enemy.bullets = enemy.params.bullets
@@ -68,11 +61,11 @@ function addWavyParams(enemy, dt)
   s = 2*math.random(0,1)-1
   dv = s*math.exp(love.math.randomNormal(0.3, 0))
 
-  enemy.k = enemy.params.k
+  enemy.k = {x = enemy.params.k.x, y = enemy.params.k.y}
   enemy.xc = enemy.x
 
   enemy.v.y = enemy.params.vAvg.y
-  enemy.v.x = enemy.params.vAvg.x*dv
+  enemy.v.x = enemy.params.vAvg.x --*dv
 end
 
 function initEnemies()
@@ -93,13 +86,19 @@ end
 function enemiesGenerate(dt)
   if love.math.random() < evolParams.thrsh * evolDyn.thrshm then
     type = enemyParams.names[math.random(1, #(enemyParams.names))]
+
     params = enemyParams.params[type]
     img = params.img
+    if params.a ~= nil then
+      a = {x = params.a.x, y = params.a.y}
+    else
+      a = {x = 0, y = 0}
+    end
+
     enemy = {
       x = love.math.random()*(love.graphics.getWidth() - img:getWidth()),
       y = - img:getHeight() - 5,
-      v = {x = params.v.x, y = params.v.y},
-      a = {x = params.a.x, y = params.a.y},
+      a = a,
       m = params.m,
       img = img,
       life = params.life,
@@ -135,26 +134,8 @@ function enemiesCollide(dt)
         collided = true
       end
     end
-    for j, enemyBullet in ipairs(enemyBullets) do
-      if collideBullet(bullet, enemyBullet) then
-        collided = true
-      end
-    end
     if collided then
       table.remove(bullets, i)
-    end
-  end
-
-  for i, bullet in ipairs(enemyBullets) do
-    if simpleCollision(player, bullet) then
-      loseOneLife()
-      break
-    end
-  end
-
-  for j, bullet in ipairs(enemyBullets) do
-    if bullet.life <= 0 then
-      table.remove(enemyBullets, j)
     end
   end
 
@@ -186,7 +167,10 @@ function inertia(dt, o)
 end
 
 function moveWavy(dt, o)
-  o.a.x = o.a.x - o.k.x*(o.x - o.xc)/o.m
+  sgn = 1
+  if o.x < o.xc then sgn = -1 end
+
+  o.a.x = o.a.x - sgn * o.k.x*math.pow(o.x - o.xc, 2)/o.m
 end
 
 function enemyActivate(dt, enemy)
@@ -209,7 +193,7 @@ function enemyActivate(dt, enemy)
 
     bullet.a = {x = 0, y = 0}
 
-    table.insert(enemyBullets, bullet)
+    table.insert(enemies, bullet)
     enemy.bullets = enemy.bullets - 1
     if enemy.bullets == 0 then
       enemy.bullets = enemy.params.bullets
@@ -229,8 +213,8 @@ function addGravity(dt, enemy)
         d = math.sqrt(dx*dx + dy*dy)
 
         fc = bullet.gravc / (d*d*d)
-        enemy.a.x = -dx*fc/enemy.m
-        enemy.a.y = -dy*fc/enemy.m
+        enemy.a.x = enemy.a.x - dx*fc/enemy.m
+        enemy.a.y = enemy.a.y - dy*fc/enemy.m
       end
     end
   end
@@ -238,7 +222,7 @@ end
 
 function enemiesMove(dt)
   for i, enemy in ipairs(enemies) do
-    enemy.a = {x = enemy.params.a.x, y = enemy.params.a.y}
+    enemy.a = {x = 0, y = 0}
     addGravity(dt, enemy)
 
     if enemy.type == "wavy" then
@@ -261,26 +245,11 @@ function enemiesMove(dt)
       table.remove(enemies, i)
     end
   end
-
-  for i, bullet in ipairs(enemyBullets) do
-    addGravity(dt, bullet)
-    inertia(dt, bullet)
-    bullet.y = bullet.y + bgV*dt
-    if bullet.x < 10 or bullet.x > love.graphics.getWidth() + 10
-    or bullet.y < 10 or bullet.y > love.graphics.getWidth() + 10 then
-      table.remove(enemyBullets, i)
-    end
-  end
 end
 
 function enemiesDraw(dt)
   for i, enemy in ipairs(enemies) do
     love.graphics.draw(enemy.img, gridPos(enemy.x - enemy.img:getWidth()/2),
                        gridPos(enemy.y - enemy.img:getHeight()/2))
-  end
-
-  for i, bullet in ipairs(enemyBullets) do
-    love.graphics.draw(bullet.img, gridPos(bullet.x - bullet.img:getWidth()/2),
-                       gridPos(bullet.y - bullet.img:getHeight()/2))
   end
 end

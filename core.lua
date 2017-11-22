@@ -17,7 +17,7 @@ playerParams = {
 
 -- evolution params, static, tunable
 evolParams = {
-  thrsh = 0.02,
+  thrsh = 0.01,
   thrshMultInit = 1.02
 }
 
@@ -60,6 +60,9 @@ function resetLevelState()
   lives = 3
   evolDyn.thrshm = evolParams.thrshMultInit
 
+  enemies = {}
+  bullets = {}
+
   initPlayer()
 end
 
@@ -97,11 +100,22 @@ function drawBG()
   love.graphics.setColor(r, g, b, a)
 end
 
+function initWeaponDyn()
+  -- FIXME recycle this
+  weaponDyn.weaponIdx = 0
+  weaponDyn.currentWeapon = "stars"
+  weaponDyn.canShoot = true
+  weaponDyn.freq = weapons.params.stars.freq
+  weaponDyn.canShootTimer = 1/weapons.params.stars.freq
+end
+
 function initPlayer()
   player.x = love.graphics.getWidth() / 2
   player.y = love.graphics.getHeight() - 100
   player.accel = playerParams.accel
   player.speed = {x = 0, y = 0}
+
+  initWeaponDyn()
 end
 
 function loseOneLife()
