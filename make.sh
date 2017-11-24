@@ -2,6 +2,8 @@
 rm -rf *.love
 rm -rf bundle/barry.app
 zip -9 -x '*.piko' *.sh *.DS_Store *.git/* bundle/* .gitignore -r barry.love .
+
+# creates a mac bundle
 if [ `uname` == 'Darwin' ]; then
   if [ -e /Applications/love.app ]; then
     cp -r /Applications/love.app bundle/

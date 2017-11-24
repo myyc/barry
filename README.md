@@ -1,7 +1,8 @@
 barry
 =====
 
-`barry` is a 2D side-scrolling shooter made with [löve](http://love2d.org/).
+`barry` is a 2D side-scrolling shooter made with [löve](http://love2d.org/)
+(cos the engine is called löve, get it?).
 
 Install löve, then clone the repo and run `make.sh`; it will give you a
 .love executable, and, if you're on OSX, a nice Mac app inside `bundle/`

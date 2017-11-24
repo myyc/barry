@@ -2,6 +2,7 @@ require "aux"
 require "weapons"
 require "input"
 require "enemies"
+require "anims"
 
 debug = true
 
@@ -54,6 +55,8 @@ bgV = 20
 white = {r = 255, g = 255, b = 255}
 gameoverTimeout = gameoverTimeoutMax
 
+shootMode = shootModes.primarySecondary
+
 function resetLevelState()
   evolDyn.killed = 0
   evolDyn.lv = 1
@@ -100,22 +103,11 @@ function drawBG()
   love.graphics.setColor(r, g, b, a)
 end
 
-function initWeaponDyn()
-  -- FIXME recycle this
-  weaponDyn.weaponIdx = 0
-  weaponDyn.currentWeapon = "stars"
-  weaponDyn.canShoot = true
-  weaponDyn.freq = weapons.params.stars.freq
-  weaponDyn.canShootTimer = 1/weapons.params.stars.freq
-end
-
 function initPlayer()
   player.x = love.graphics.getWidth() / 2
   player.y = love.graphics.getHeight() - 100
   player.accel = playerParams.accel
   player.speed = {x = 0, y = 0}
-
-  initWeaponDyn()
 end
 
 function loseOneLife()
@@ -136,26 +128,10 @@ function coreLoad(arg)
   initEnemies()
   initWeapons()
   initBG()
+  initAnimations()
 
   lifeImg = love.graphics.newImage(lifeSprite)
   player.img = love.graphics.newImage(playerParams.sprite)
-
-  -- add more sounds
-  --[[
-  for i = 1,4 do
-    table.insert(enemyDyn.sounds,
-                 love.audio.newSource(string.format("assets/audio/pow%d.wav", i), "static"))
-  end
-
-  for i = 1,4 do
-    table.insert(playerDyn.sounds,
-                 love.audio.newSource(string.format("assets/audio/boo%d.wav", i), "static"))
-  end
-
-  music = love.audio.newSource("assets/audio/sll.wav")
-  music:setLooping(true)
-  music:play()
-  ]]--
 end
 
 function move(direction, dt)
@@ -180,13 +156,6 @@ end
 
 function byebye()
   love.event.push("quit")
-end
-
-function switchWeapon(back)
-  weaponDyn.weaponIdx = (weaponDyn.weaponIdx + (back and -1 or 1)) % #weapons.names
-  weaponDyn.currentWeapon = weapons.names[weaponDyn.weaponIdx+1]
-  weaponDyn.freq = weapons.params[weaponDyn.currentWeapon].freq
-  weaponDyn.canShootTimer = 1/weaponDyn.freq
 end
 
 -- edges
@@ -254,9 +223,10 @@ function coreUpdate(dt)
   constrainToEdges(dt)
 
   -- enable shooting
-  weaponDyn.canShootTimer = weaponDyn.canShootTimer - (1 * dt)
-  if weaponDyn.canShootTimer < 0 then
-    weaponDyn.canShoot = true
+  adjustWeaponTimers(dt, currentWeapon)
+
+  if shootMode == shootModes.primarySecondary then
+    adjustWeaponTimers(dt, secondaryWeapon)
   end
 
   -- generate enemies
@@ -264,13 +234,14 @@ function coreUpdate(dt)
 
   -- move bullets around
   for i, bullet in ipairs(bullets) do
-    moveBullet(dt, bullets, i)
+    moveBullet(dt, i)
   end
 
   enemiesMove(dt)
 
   -- collisions between enemies and stuff, including you
   enemiesCollide(dt)
+  explosionsProcess(dt)
 
   -- stupid shit
   --player.x = math.floor(player.x / 4) * 4
@@ -292,6 +263,7 @@ function coreDraw(dt)
   end
 
   enemiesDraw(dt)
+  explosionsDraw(dt)
 
   for i = 0, lives-1 do
     love.graphics.draw(lifeImg, 10 + i*(lifeImg:getWidth() + 6), 10)

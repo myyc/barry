@@ -1,5 +1,10 @@
 joystick = nil
 
+shootModes = {
+  primarySecondary = 1,
+  rotating = 2,
+}
+
 function love.joystickadded(j)
     joystick = j
 end
@@ -30,7 +35,7 @@ function handleJoystick(dt)
 
     -- shooting
     if joystick:isGamepadDown("a", "b") then
-      shoot(bullets)
+      shoot()
     end
   end
 end
@@ -55,7 +60,10 @@ function handleKeyboard(dt)
 
   -- shooting
   if love.keyboard.isDown("space") then
-    shoot(bullets)
+    shoot()
+  end
+  if love.keyboard.isDown("x", "z") then
+    shoot(secondaryWeapon)
   end
 end
 

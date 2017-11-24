@@ -1,6 +1,6 @@
 -- static enemy params
 enemyParams = {
-  names = {}, -- filled programmatically
+  names = {"dumb", "wavy", "brownian", "staticShooter"}, -- filled programmatically
   params = {
     dumb = {
       vAvg = {x = 0, y = 100},
@@ -19,6 +19,16 @@ enemyParams = {
       motion = "uniform",
       life = 80,
     },
+    brownian = {
+      v = {x = 0, y = 30},
+      m = 100,
+      vAvg = {x = 0, y = 120},
+      acc = {x = 0, y = 1000},
+      initialTimeout = 0.5,
+      sprite = "assets/img/invader3.png",
+      motion = "uniform",
+      life = 80,
+    },
     staticShooter = {
       v = {x = 0, y = 0},
       a = {x = 0, y = 0},
@@ -28,12 +38,13 @@ enemyParams = {
       freq = 5,
       initialTimeout = 2,
       bullets = 6,
-      bulletParams = {
-        m = 30,
-        avgSpeed = 200,
-        life = 1,
-        sprite = "assets/img/bullet.png"
-      }
+      bulletType = "simple",
+    },
+    simpleBullet = {
+      m = 30,
+      avgSpeed = 200,
+      life = 1,
+      sprite = "assets/img/bullet.png"
     }
   }
 }
@@ -53,7 +64,6 @@ enemyState = {
 enemies = {}
 
 function addSSParams(enemy, dt)
-  enemy.bulletParams = enemy.params.bulletParams
   enemy.bullets = enemy.params.bullets
 end
 
@@ -65,12 +75,17 @@ function addWavyParams(enemy, dt)
   enemy.xc = enemy.x
 
   enemy.v.y = enemy.params.vAvg.y
-  enemy.v.x = enemy.params.vAvg.x --*dv
+  enemy.v.x = enemy.params.vAvg.x * dv
+end
+
+function addBrownianParams(enemy, dt)
+  enemy.acc = {x = enemy.params.acc.x, y = enemy.params.acc.y}
+  enemy.braking = false
 end
 
 function initEnemies()
-  enemyParams.params.dumb.addParams = function() end
   enemyParams.params.wavy.addParams = addWavyParams
+  enemyParams.params.brownian.addParams = addBrownianParams
   enemyParams.params.staticShooter.addParams = addSSParams
 
   for type, params in pairs(enemyParams.params) do
@@ -78,14 +93,13 @@ function initEnemies()
     if params.bulletParams ~= nil then
       params.bulletParams.img = love.graphics.newImage(params.bulletParams.sprite)
     end
-    table.insert(enemyParams.names, type)
-    --enemyDyn[type].vAvg = params.vAvg
   end
 end
 
 function enemiesGenerate(dt)
   if love.math.random() < evolParams.thrsh * evolDyn.thrshm then
     type = enemyParams.names[math.random(1, #(enemyParams.names))]
+    --type = "brownian"
 
     params = enemyParams.params[type]
     img = params.img
@@ -106,7 +120,7 @@ function enemiesGenerate(dt)
       params = params
     }
 
-    if params.motion == "uniform" then
+    if params.motion == "uniform" and params.v == nil then
       enemy.v = {
         x = 0,
         y = (1 + params.speedBand / 2 - params.speedBand*math.random()) * params.vAvg.y
@@ -119,7 +133,9 @@ function enemiesGenerate(dt)
       enemy.timeout = params.initialTimeout
     end
 
-    enemy.params.addParams(enemy, dt)
+    if enemy.params.addParams ~= nil then
+      enemy.params.addParams(enemy, dt)
+    end
 
     table.insert(enemies, enemy)
   end
@@ -135,6 +151,10 @@ function enemiesCollide(dt)
       end
     end
     if collided then
+      if bullet.params.explosion ~= nil then
+        anim = newAnimation(bullet.params.explosion, bullet.x, bullet.y)
+        table.insert(explosions, anim)
+      end
       table.remove(bullets, i)
     end
   end
@@ -142,6 +162,13 @@ function enemiesCollide(dt)
   for j, enemy in ipairs(enemies) do
     -- bullets
     if enemy.life <= 0 then
+      if enemy.params.explosion ~= nil then
+        expl = enemy.params.explosion
+      else
+        expl = genericEnemyExplosion
+      end
+      anim = newAnimation(expl, enemy.x, enemy.y)
+      table.insert(explosions, anim)
       table.remove(enemies, j)
       evolDyn.killed = evolDyn.killed + 1
       evolDyn.stopGettingHarder = false
@@ -151,6 +178,9 @@ function enemiesCollide(dt)
     -- yourself
     if enemy.params.motion ~= "still" then
       if simpleCollision(player, enemy) then
+        expl = genericEnemyExplosion
+        anim = newAnimation(expl, player.x, player.y)
+        table.insert(explosions, anim)
         loseOneLife()
         break
       end
@@ -173,33 +203,68 @@ function moveWavy(dt, o)
   o.a.x = o.a.x - sgn * o.k.x*math.pow(o.x - o.xc, 2)/o.m
 end
 
+function moveBrownian(dt, o)
+  if o.timeout < o.params.initialTimeout / 2 and o.timeout > 0 then
+    if not o.braking then
+      o.acc.x = -o.acc.x
+      o.acc.y = -o.acc.y
+      o.braking = true
+    end
+  elseif o.timeout < 0 then
+    o.braking = false
+    t = math.random(0, math.pi)
+    o.acc.x = o.params.acc.y*math.cos(t)
+    o.acc.y = o.params.acc.y*math.sin(t)
+
+    o.timeout = o.params.initialTimeout
+  end
+
+  o.a.x = o.a.x + o.acc.x
+  o.a.y = o.a.y + o.acc.y
+
+  o.timeout = o.timeout - dt
+end
+
+function shootAimingBullet(dt, enemy, params)
+  bullet = {
+    x = enemy.x,
+    y = enemy.y, img = params.img,
+    m = params.m,
+    life = params.life,
+    params = params,
+  }
+
+  dx = player.x - enemy.x
+  dy = player.y - enemy.y
+  d = math.sqrt(dx*dx + dy*dy)
+
+  bullet.v = {x = params.avgSpeed*dx/d,
+              y = params.avgSpeed*dy/d}
+
+  bullet.a = {x = 0, y = 0}
+
+  table.insert(enemies, bullet)
+end
+
 function enemyActivate(dt, enemy)
   if enemy.type == "staticShooter" then
-    params = enemy.bulletParams
-    bullet = {
-      x = enemy.x,
-      y = enemy.y, img = params.img,
-      m = params.m,
-      life = params.life,
-      params = params,
-    }
+    if enemy.timeout ~= nil then
+      enemy.timeout = enemy.timeout - dt
+      if enemy.timeout < 0 then
+        shootAimingBullet(dt, enemy, enemyParams.params.simpleBullet)
 
-    dx = player.x - enemy.x
-    dy = player.y - enemy.y
-    d = math.sqrt(dx*dx + dy*dy)
-
-    bullet.v = {x = params.avgSpeed*dx/d,
-                y = params.avgSpeed*dy/d}
-
-    bullet.a = {x = 0, y = 0}
-
-    table.insert(enemies, bullet)
-    enemy.bullets = enemy.bullets - 1
-    if enemy.bullets == 0 then
-      enemy.bullets = enemy.params.bullets
-      enemy.timeout = enemy.params.initialTimeout
-    else
-      enemy.timeout = 1/enemy.params.freq
+        enemy.bullets = enemy.bullets - 1
+        if enemy.bullets == 0 then
+          enemy.bullets = enemy.params.bullets
+          enemy.timeout = enemy.params.initialTimeout
+        else
+          enemy.timeout = 1/enemy.params.freq
+        end
+      end
+    end
+  elseif enemy.type == "brownian" then
+    if math.random() < 0.01 then
+      shootAimingBullet(dt, enemy, enemyParams.params.simpleBullet)
     end
   end
 end
@@ -227,6 +292,8 @@ function enemiesMove(dt)
 
     if enemy.type == "wavy" then
       moveWavy(dt, enemy)
+    elseif enemy.type == "brownian" then
+      moveBrownian(dt, enemy)
     end
 
     inertia(dt, enemy)
@@ -234,12 +301,7 @@ function enemiesMove(dt)
     -- move with the background
     enemy.y = enemy.y + bgV*dt
 
-    if enemy.timeout ~= nil then
-      enemy.timeout = enemy.timeout - dt
-      if enemy.timeout < 0 then
-        enemyActivate(dt, enemy)
-      end
-    end
+    enemyActivate(dt, enemy)
 
     if enemy.y + enemy.img:getHeight() > love.graphics.getHeight() then
       table.remove(enemies, i)

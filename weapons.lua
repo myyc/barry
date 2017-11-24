@@ -56,13 +56,10 @@ weapons = {
   }
 }
 
-weaponDyn = {
-  weaponIdx = 0,
-  currentWeapon = "stars",
-  canShoot = true,
-  freq = weapons.params.stars.freq,
-  canShootTimer = 1/weapons.params.stars.freq,
-}
+weaponInv = {}
+
+currentWeapon = nil
+secondaryWeapon = weapons.params.blackholegun
 
 blackHoleParams = {
   mass = 400,
@@ -72,6 +69,34 @@ blackHoleParams = {
   dmg = 999999
 }
 
+function initWeapon(weapon)
+  weapon.dyn = {
+    canShoot = true,
+    freq = weapon.freq,
+    canShootTimer = 1/weapon.freq,
+  }
+end
+
+function selectWeapon(weapon)
+  initWeapon(weapon)
+  currentWeapon = weapon
+end
+
+function reallySwitchWeapon(back)
+  idx = (weaponInv[currentWeapon.name] + (back and -1 or 1)) % #weapons.names
+  currentWeapon = weapons.params[weapons.names[idx+1]]
+  currentWeapon:select()
+end
+
+function switchWeapon(back)
+  if shootMode == shootModes.rotating then
+    reallySwitchWeapon(back)
+  elseif shootMode == shootModes.primarySecondary then
+    repeat reallySwitchWeapon(back)
+    until currentWeapon ~= secondaryWeapon
+  end
+end
+
 function initWeapons()
   weapons.params.machinegun.img = love.graphics.newImage(weapons.params.machinegun.sprite)
   weapons.params.stars.img = love.graphics.newImage(weapons.params.stars.sprite)
@@ -80,30 +105,30 @@ function initWeapons()
 
   blackHoleParams.img = love.graphics.newImage(blackHoleParams.sprite)
 
-  weapons.params.machinegun.shootFunc = shootMachineGun
-  weapons.params.stars.shootFunc = shootStar
-  weapons.params.rockets.shootFunc = shootRocket
-  weapons.params.blackholegun.shootFunc = shootBlackHole
+  weapons.params.machinegun.select = selectWeapon
+  weapons.params.stars.select = selectWeapon
+  weapons.params.rockets.select = selectWeapon
+  weapons.params.blackholegun.select = selectWeapon
 
-  for type, params in pairs(weapons.params) do
-    table.insert(weapons.names, type)
+  weapons.params.machinegun.shoot = shootMachineGun
+  weapons.params.stars.shoot = shootStar
+  weapons.params.rockets.shoot = shootRocket
+  weapons.params.blackholegun.shoot = shootBlackHole
+
+  i = 0
+  for name, params in pairs(weapons.params) do
+    table.insert(weapons.names, name)
+    weaponInv[name] = i
+    params.name = name
+    i = i + 1
   end
 
-  -- uncomment when sounds are back
-  --[[
-  for i = 1,5 do
-    table.insert(weapons.params.stars.sounds,
-                 love.audio.newSource(string.format("assets/audio/pew%d.wav", i), "static"))
+  currentWeapon = weapons.params.stars
+  currentWeapon:select()
+
+  if shootMode == shootModes.primarySecondary then
+    initWeapon(secondaryWeapon)
   end
-  for i = 1,4 do
-    table.insert(weapons.params.rockets.sounds,
-                 love.audio.newSource(string.format("assets/audio/woosh%d.wav", i), "static"))
-  end
-  for i = 1,6 do
-    table.insert(weapons.params.machinegun.sounds,
-                 love.audio.newSource(string.format("assets/audio/tap%d.wav", i), "static"))
-  end
-  ]]--
 end
 
 function getTTL(ttl)
@@ -121,7 +146,7 @@ function createBlackHole(x, y)
   table.insert(bullets, blackHole)
 end
 
-function shootStar(bullets)
+function shootStar()
   params = weapons.params.stars
   bullet = {
     x = player.x,
@@ -135,7 +160,7 @@ function shootStar(bullets)
   table.insert(bullets, bullet)
 end
 
-function shootMachineGun(bullets)
+function shootMachineGun()
   params = weapons.params.machinegun
   for i = -1, 1, 2 do
     bullet = {
@@ -150,7 +175,7 @@ function shootMachineGun(bullets)
   end
 end
 
-function shootRocket(bullets)
+function shootRocket()
   params = weapons.params.rockets
   bullet = {
     x = player.x,
@@ -164,7 +189,7 @@ function shootRocket(bullets)
   table.insert(bullets, bullet)
 end
 
-function shootBlackHole(bullets)
+function shootBlackHole()
   params = weapons.params.blackholegun
   bullet = {
     x = player.x,
@@ -178,7 +203,7 @@ function shootBlackHole(bullets)
   table.insert(bullets, bullet)
 end
 
-function moveUniform(dt, bullets, i)
+function moveUniform(dt, i)
   bullet = bullets[i]
   bullet.y = bullet.y - (bullet.v.y * dt)
   bullet.x = bullet.x - (bullet.v.x * dt)
@@ -190,7 +215,7 @@ function moveUniform(dt, bullets, i)
   end
 end
 
-function moveAccel(dt, bullets, i)
+function moveAccel(dt, i)
   bullet = bullets[i]
   bullet.v.y = bullet.params.accel*dt + bullet.v.y
   bullet.x = bullet.x + (bullet.v.x * dt)
@@ -203,14 +228,14 @@ function moveAccel(dt, bullets, i)
   end
 end
 
-function moveBullet(dt, bullets, i)
+function moveBullet(dt, i)
   bullet = bullets[i]
   bullet.y = bullet.y + bgV*dt
 
   if bullet.params.type == "bullet" then
-    moveUniform(dt, bullets, i)
+    moveUniform(dt, i)
   elseif bullet.params.type == "rocket" then
-    moveAccel(dt, bullets, i)
+    moveAccel(dt, i)
   end
 
   if bullet.ttl < 0 or (bullet.mass ~= nil and bullet.mass == 0) then
@@ -244,13 +269,28 @@ function drawBullet(bullet)
                      gridPos(bullet.y - bullet.img:getHeight() / 2))
 end
 
-function shoot(bullets)
-  if weaponDyn.canShoot then
-    weapons.params[weaponDyn.currentWeapon].shootFunc(bullets)
-    weaponDyn.canShootTimer = 1/weaponDyn.freq
-    weaponDyn.canShoot = false
+function shootWeaponIfPossible(weapon)
+  if weapon.dyn.canShoot then
+    weapon:shoot()
+    weapon.dyn.canShootTimer = 1/weapon.freq
+    weapon.dyn.canShoot = false
+  end
+end
 
-    --snds = weapons.params[weaponDyn.currentWeapon].sounds
-    --playRandomSound(snds)
+function shoot(weapon)
+  if shootMode == shootModes.rotating then
+    shootWeaponIfPossible(currentWeapon)
+  elseif shootMode == shootModes.primarySecondary then
+    if weapon == nil then
+      weapon = currentWeapon
+    end
+    shootWeaponIfPossible(weapon)
+  end
+end
+
+function adjustWeaponTimers(dt, weapon)
+  weapon.dyn.canShootTimer = weapon.dyn.canShootTimer - (1 * dt)
+  if weapon.dyn.canShootTimer < 0 then
+    weapon.dyn.canShoot = true
   end
 end
