@@ -10,10 +10,10 @@ lifeSprite = "assets/img/life.png"
 
 -- player shit, static, tunable
 playerParams = {
-  friction = 0.1,
-  maxSpeed = 500,
+  brake = 0.3,
+  vc = 7, -- air resistance
   sprite = "assets/img/ship.png",
-  accel = {x = 4000, y = 9000},
+  acc = {x = 12000, y = 18000},
 }
 
 -- evolution params, static, tunable
@@ -106,8 +106,8 @@ end
 function initPlayer()
   player.x = love.graphics.getWidth() / 2
   player.y = love.graphics.getHeight() - 100
-  player.accel = playerParams.accel
-  player.speed = {x = 0, y = 0}
+  player.a = {x = playerParams.acc.x, y = playerParams.acc.y}
+  player.v = {x = 0, y = 0}
 end
 
 function loseOneLife()
@@ -136,21 +136,13 @@ end
 
 function move(direction, dt)
   if direction == "left" then
-    if player.speed.x > -playerParams.maxSpeed then
-      player.speed.x = player.speed.x - (player.accel.x*dt)
-    end
+    player.a.x = -playerParams.acc.x
   elseif direction == "right" then
-    if player.speed.x < playerParams.maxSpeed then
-      player.speed.x = player.speed.x + (player.accel.x*dt)
-    end
+    player.a.x = playerParams.acc.x
   elseif direction == "up" then
-    if player.speed.y > -playerParams.maxSpeed then
-      player.speed.y = player.speed.y - (player.accel.y*dt)
-    end
+    player.a.y = -playerParams.acc.y
   elseif direction == "down" then
-    if player.speed.y < playerParams.maxSpeed then
-      player.speed.y = player.speed.y + (player.accel.y*dt)
-    end
+    player.a.y = playerParams.acc.y
   end
 end
 
@@ -158,12 +150,12 @@ function byebye()
   love.event.push("quit")
 end
 
--- edges
-function constrainToEdges(dt)
+-- moves the ship and constrains it to the viewing field
+function moveShip(dt)
   if player.x > -1 and player.x < love.graphics.getWidth() + 1 then
-    player.x = player.x + (player.speed.x*dt)
+    player.x = player.x + (player.v.x*dt)
   else
-    player.speed.x = 0
+    player.v.x = 0
     if player.x < 20 then
       player.x = 0
     else
@@ -172,9 +164,9 @@ function constrainToEdges(dt)
   end
 
   if player.y > -1 and player.y < love.graphics.getHeight() + 1 then
-    player.y = player.y + (player.speed.y*dt)
+    player.y = player.y + (player.v.y*dt)
   else
-    player.speed.y = 0
+    player.v.y = 0
     if player.y < 20 then
       player.y = 0
     else
@@ -216,11 +208,18 @@ function coreUpdate(dt)
   handleKeyboard(dt)
   handleJoystick(dt)
 
-  -- friction
-  player.speed.x = (1 - playerParams.friction)*player.speed.x
-  player.speed.y = (1 - playerParams.friction)*player.speed.y
+  player.a.x = player.a.x - playerParams.vc*player.v.x
+  player.a.y = player.a.y - playerParams.vc*player.v.y
 
-  constrainToEdges(dt)
+  player.v.x = player.v.x + player.a.x*dt
+  player.v.y = player.v.y + player.a.y*dt
+
+  -- auto-brake: not very physics-y but necessary unless you want to
+  -- add a brake key – you don't
+  player.v.x = (1 - playerParams.brake)*player.v.x
+  player.v.y = (1 - playerParams.brake)*player.v.y
+
+  moveShip(dt)
 
   -- enable shooting
   adjustWeaponTimers(dt, currentWeapon)
@@ -242,10 +241,6 @@ function coreUpdate(dt)
   -- collisions between enemies and stuff, including you
   enemiesCollide(dt)
   explosionsProcess(dt)
-
-  -- stupid shit
-  --player.x = math.floor(player.x / 4) * 4
-  --player.y = math.floor(player.y / 4) * 4
 
   moveBG(dt)
 end
